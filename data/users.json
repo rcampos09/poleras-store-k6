@@ -1,0 +1,224 @@
+{
+  "users": [
+    {
+      "email": "user01@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user02@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user03@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user04@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user05@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user06@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user07@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user08@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user09@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user10@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user11@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user12@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user13@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user14@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user15@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user16@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user17@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user18@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user19@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user20@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user21@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user22@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user23@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user24@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user25@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user26@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user27@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user28@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user29@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user30@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user31@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user32@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user33@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user34@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user35@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user36@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user37@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user38@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user39@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user40@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user41@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user42@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user43@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user44@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user45@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user46@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user47@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user48@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user49@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user50@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user51@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user52@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user53@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user54@test.com",
+      "password": "Test1234!"
+    },
+    {
+      "email": "user55@test.com",
+      "password": "Test1234!"
+    }
+  ]
+}
