@@ -15,15 +15,33 @@ import { Rate }                from 'k6/metrics';
 import { htmlReport }          from 'https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js';
 import { textSummary }         from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 
-import { e2eTpsLoadOptions, THRESHOLDS } from '../../config/options.js';
+import { e2eTpsLoadOptions }          from '../../config/options.js';
 import { jsonHeaders }                from '../../lib/http.js';
 import { register, login }            from '../../lib/auth.js';
 import { newSessionId }               from '../../lib/session.js';
 
 // ─── Block 1: Options ────────────────────────────────────────────────────────
+// Tipo de prueba seleccionable vía --env SCENARIO=smoke|load (default: load).
+// Regla DEV-8: un script por servicio — los tipos de prueba se controlan vía
+// options.scenarios, nunca con archivos genéricos smoke.js/load.js aparte.
+const SCENARIO = __ENV.SCENARIO || 'load';
+
+const scenarios = {
+  // Smoke: 1 VU x 2 iteraciones — valida el journey completo en ~30s
+  smoke: {
+    executor:   'shared-iterations',
+    vus:        1,
+    iterations: 2,
+  },
+  // Load: 50 TPS sostenidos — ver cálculo de preAllocatedVUs en e2eTpsLoadOptions
+  load: {
+    ...e2eTpsLoadOptions.scenarios.load,
+  },
+};
+
 // Thresholds por servicio + check global de compras exitosas > 95% (DEV-24)
 export const options = {
-  ...e2eTpsLoadOptions,
+  scenarios: { [SCENARIO]: scenarios[SCENARIO] },
   thresholds: {
     'http_req_duration{service:auth}':     ['p(95)<450'],
     'http_req_duration{service:products}': ['p(95)<300'],
@@ -58,16 +76,19 @@ const ADDRESS    = { street: 'Av. Providencia 1234', city: 'Santiago', region: '
 const CARD_OK    = '4111 1111 1111 1234';
 
 // ─── Block 3: Setup ──────────────────────────────────────────────────────────
-// 700 usuarios únicos — 1 por preAllocatedVU (sin colisiones de carrito).
-// Registro en lotes de 10 paralelos → ~70 lotes × ~200ms ≈ 14s de setup.
+// Cantidad de usuarios escalada por escenario:
+//   smoke → 3  (1 VU x 2 iteraciones, validación rápida ~30s)
+//   load  → 700 (== preAllocatedVUs en e2eTpsLoadOptions, sin colisiones de carrito)
+// Registro en lotes de 10 paralelos vía http.batch().
 export function setup() {
   const runId     = Date.now();
-  const count     = 700;   // == preAllocatedVUs en e2eTpsLoadOptions
+  const count     = SCENARIO === 'smoke' ? 3 : 700;
   const batchSize = 10;
   const password  = 'Perf1234!';
+  const prefix    = SCENARIO === 'smoke' ? 'perf_e2e_smoke' : 'perf_e2e';
   const users     = [];
 
-  console.log(`[DEV-24] Registrando ${count} usuarios en lotes de ${batchSize} (runId: ${runId})...`);
+  console.log(`[DEV-24 ${SCENARIO}] Registrando ${count} usuarios en lotes de ${batchSize} (runId: ${runId})...`);
 
   for (let b = 0; b < Math.ceil(count / batchSize); b++) {
     const start = b * batchSize + 1;
@@ -75,7 +96,7 @@ export function setup() {
     const batch = [];
 
     for (let i = start; i <= end; i++) {
-      const email = `perf_e2e_${i}_${runId}@loadtest.cl`;
+      const email = `${prefix}_${i}_${runId}@loadtest.cl`;
       batch.push([
         'POST',
         `${USERS_URL}/api/auth/register`,
@@ -87,7 +108,7 @@ export function setup() {
     const results = http.batch(batch);
     for (let j = 0; j < results.length; j++) {
       const i     = b * batchSize + j + 1;
-      const email = `perf_e2e_${i}_${runId}@loadtest.cl`;
+      const email = `${prefix}_${i}_${runId}@loadtest.cl`;
       try {
         const token = results[j].json().data.token;
         users.push({ email, password, token: token || null });
@@ -98,7 +119,7 @@ export function setup() {
   }
 
   const ok = users.filter((u) => u.token).length;
-  console.log(`[DEV-24] ${ok}/${count} usuarios listos. Happy Path 50 TPS × 9 min iniciando.`);
+  console.log(`[DEV-24 ${SCENARIO}] ${ok}/${count} usuarios listos. Iniciando Happy Path...`);
   return { users };
 }
 
@@ -260,9 +281,12 @@ export default function (data) {
 }
 
 // ─── Block 5: Summary ────────────────────────────────────────────────────────
+// Convención CLAUDE.md: results/YYYY-MM-DD_<tipo-prueba>_<servicio>/
 export function handleSummary(data) {
+  const date   = new Date().toISOString().slice(0, 10);
+  const folder = `results/${date}_${SCENARIO}_e2e`;
   return {
-    'results/2026-06-05_load_e2e_50tps/report.html': htmlReport(data),
+    [`${folder}/report.html`]: htmlReport(data),
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
   };
 }
