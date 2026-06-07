@@ -1,18 +1,20 @@
 // tests/products/products.test.js
 // ─────────────────────────────────────────────────────────────────────────────
-// DEV-20 — Script de catálogo de productos
+// DEV-20 — Load Test · Catálogo de productos
 // Servicio: products-service :3002
+// Tipo: Load Test — carga normal sostenida (baseline de producción)
 // SLA (DEV-13): P95 < 300ms · Error rate < 0.5%
 // Volumen: 70% del tráfico total de la plataforma
 // Flujo: listado → selección → detalle (navegación realista de usuario)
+// Resultado: results/2026-06-04_load_products/report.html
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Imports — siempre primero
-import http             from 'k6/http';
-import { check, sleep } from 'k6';
-import { SharedArray }  from 'k6/data';
-import { htmlReport }   from 'https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js';
-import { textSummary }  from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
+import http                    from 'k6/http';
+import { check, group, sleep } from 'k6';
+import { SharedArray }         from 'k6/data';
+import { htmlReport }          from 'https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js';
+import { textSummary }         from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 
 import { productsLoadOptions, THRESHOLDS } from '../../config/options.js';
 import { jsonHeaders }                     from '../../lib/http.js';
@@ -20,10 +22,16 @@ import { newSessionId }                    from '../../lib/session.js';
 
 // ─── Block 1: Options ────────────────────────────────────────────────────────
 // Threshold products: P95 < 300ms · error rate < 0.5% (DEV-13)
+// abortOnFail: aborta si error rate > 50% antes de los 90s (regla de corte CLAUDE.md)
 // Para smoke test: k6 run --vus 2 --duration 30s --env BASE_URL=http://localhost:3002 tests/products/products.test.js
 export const options = {
   ...productsLoadOptions,
-  thresholds: THRESHOLDS.products,
+  thresholds: {
+    ...THRESHOLDS.products,
+    'http_req_failed': [
+      { threshold: 'rate<0.005', abortOnFail: true, delayAbortEval: '90s' },
+    ],
+  },
 };
 
 // ─── Block 2: Data ───────────────────────────────────────────────────────────
@@ -39,100 +47,108 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:3002';
 
 // ─── Block 3: Setup ──────────────────────────────────────────────────────────
 // Catálogo público — no requiere autenticación.
-// Setup valida que el servicio responde antes de lanzar los VUs.
 export function setup() {
-  console.log(`[DEV-20] Products test iniciando — ${slugs.length} slugs en dataset`);
+  console.log(`[DEV-20] LOAD TEST — products-service :3002`);
   console.log(`[DEV-20] Target: ${BASE_URL}/api/products`);
+  console.log(`[DEV-20] SLA: P95 < 300ms · Error rate < 0.5% (DEV-13)`);
+  console.log(`[DEV-20] Dataset: ${slugs.length} slugs de fallback`);
 }
 
 // ─── Block 4: Default (workload por VU) ──────────────────────────────────────
 export default function () {
   const sessionId = newSessionId();
 
-  // ── Paso 1: Listado de productos ─────────────────────────────────────────
-  // Simula usuario abriendo la página principal del catálogo (12 productos).
-  const listRes = http.get(`${BASE_URL}/api/products?limit=12`, {
-    headers: jsonHeaders({ 'X-Session-ID': sessionId }),
-    tags:    { service: 'products', endpoint: 'GET /api/products' },
-  });
+  group('Explorar Catálogo', () => {
 
-  check(listRes, {
-    '[products] listado: status 200':     (r) => r.status === 200,
-    '[products] listado: array no vacío': (r) => {
-      try { return Array.isArray(r.json()) && r.json().length > 0; }
-      catch (_) { return false; }
-    },
-    '[products] listado: tiene precio':   (r) => {
-      try { const p = r.json()[0]; return p.price !== undefined || p.precio !== undefined; }
-      catch (_) { return false; }
-    },
-    '[products] listado: tiene stock':    (r) => {
-      try { const p = r.json()[0]; return p.stock !== undefined; }
-      catch (_) { return false; }
-    },
-    '[products] listado: tiene variantes': (r) => {
-      try {
-        const p = r.json()[0];
-        const v = p.variants || p.variantes;
-        return Array.isArray(v) && v.length > 0;
-      } catch (_) { return false; }
-    },
-    '[products] listado: tiempo < 300ms': (r) => r.timings.duration < 300,
-  });
+    // ── Paso 1: Listado de productos ───────────────────────────────────────
+    let listRes;
+    group('GET /api/products', () => {
+      listRes = http.get(`${BASE_URL}/api/products?limit=12`, {
+        headers: jsonHeaders({ 'X-Session-ID': sessionId }),
+        tags:    { service: 'products', endpoint: 'GET /api/products' },
+      });
 
-  sleep(Math.random() * 2 + 1);  // think time: usuario revisa el listado (1–3s)
+      // Respuesta real: { status, code, data: [...] }
+      // Campos: base_price · variants_in_stock · available_colors · available_sizes
+      check(listRes, {
+        '[products] listado: status 200':      (r) => r.status === 200,
+        '[products] listado: array no vacío':  (r) => {
+          try { return Array.isArray(r.json().data) && r.json().data.length > 0; }
+          catch (_) { return false; }
+        },
+        '[products] listado: tiene precio':    (r) => {
+          try { return r.json().data[0].base_price !== undefined; }
+          catch (_) { return false; }
+        },
+        '[products] listado: tiene stock':     (r) => {
+          try { return r.json().data[0].variants_in_stock !== undefined; }
+          catch (_) { return false; }
+        },
+        '[products] listado: tiene variantes': (r) => {
+          try {
+            const p = r.json().data[0];
+            return Array.isArray(p.available_colors) && p.available_colors.length > 0;
+          } catch (_) { return false; }
+        },
+        '[products] listado: tiempo < 300ms':  (r) => r.timings.duration < 300,
+      });
+    });
 
-  // ── Paso 2: Detalle de producto ──────────────────────────────────────────
-  // Elige slug desde la respuesta del listado; si falla, usa el dataset local.
-  // Esto simula que el usuario hace clic en uno de los productos visibles.
-  let slug;
-  try {
-    const products = listRes.json();
-    if (Array.isArray(products) && products.length > 0) {
-      const picked = products[Math.floor(Math.random() * products.length)];
-      slug = picked.slug;
+    sleep(Math.random() * 2 + 1);  // think time: usuario revisa el listado (1–3s)
+
+    // ── Paso 2: Detalle de producto ────────────────────────────────────────
+    // Elige slug desde data[] de la respuesta del listado (realista).
+    // Fallback al SharedArray si el listado no devuelve data válida.
+    let slug;
+    try {
+      const products = listRes.json().data;
+      if (Array.isArray(products) && products.length > 0) {
+        slug = products[Math.floor(Math.random() * products.length)].slug;
+      }
+    } catch (_) { /* fallback a continuación */ }
+
+    if (!slug) {
+      slug = slugs[Math.floor(Math.random() * slugs.length)];
     }
-  } catch (_) { /* silencioso — fallback a continuación */ }
 
-  if (!slug) {
-    slug = slugs[Math.floor(Math.random() * slugs.length)];
-  }
+    group('GET /api/products/:slug', () => {
+      const detailRes = http.get(`${BASE_URL}/api/products/${slug}`, {
+        headers: jsonHeaders({ 'X-Session-ID': sessionId }),
+        tags:    { service: 'products', endpoint: 'GET /api/products/:slug' },
+      });
 
-  const detailRes = http.get(`${BASE_URL}/api/products/${slug}`, {
-    headers: jsonHeaders({ 'X-Session-ID': sessionId }),
-    tags:    { service: 'products', endpoint: 'GET /api/products/:slug' },
+      // Respuesta real: { status, code, data: { base_price, variants: [{size, color, stock}] } }
+      check(detailRes, {
+        '[products] detalle: status 200':     (r) => r.status === 200,
+        '[products] detalle: tiene precio':   (r) => {
+          try { return r.json().data.base_price !== undefined; }
+          catch (_) { return false; }
+        },
+        '[products] detalle: tiene tallas':   (r) => {
+          try {
+            const variants = r.json().data.variants;
+            return Array.isArray(variants) && variants.some((v) => v.size);
+          } catch (_) { return false; }
+        },
+        '[products] detalle: tiene colores':  (r) => {
+          try {
+            const variants = r.json().data.variants;
+            return Array.isArray(variants) && variants.some((v) => v.color);
+          } catch (_) { return false; }
+        },
+        '[products] detalle: tiempo < 300ms': (r) => r.timings.duration < 300,
+      });
+    });
+
+    sleep(Math.random() * 2 + 1);  // think time: usuario revisa el detalle (1–3s)
   });
-
-  check(detailRes, {
-    '[products] detalle: status 200':     (r) => r.status === 200,
-    '[products] detalle: tiene precio':   (r) => {
-      try { const p = r.json(); return p.price !== undefined || p.precio !== undefined; }
-      catch (_) { return false; }
-    },
-    '[products] detalle: tiene tallas':   (r) => {
-      try {
-        const p = r.json();
-        const s = p.sizes || p.tallas;
-        return Array.isArray(s) && s.length > 0;
-      } catch (_) { return false; }
-    },
-    '[products] detalle: tiene colores':  (r) => {
-      try {
-        const p = r.json();
-        const c = p.colors || p.colores;
-        return Array.isArray(c) && c.length > 0;
-      } catch (_) { return false; }
-    },
-    '[products] detalle: tiempo < 300ms': (r) => r.timings.duration < 300,
-  });
-
-  sleep(Math.random() * 2 + 1);  // think time: usuario revisa el detalle (1–3s)
 }
 
 // ─── Block 5: Summary ────────────────────────────────────────────────────────
+// Convención de carpeta: results/YYYY-MM-DD_<tipo-prueba>_<servicio>/
 export function handleSummary(data) {
   return {
-    'results/report.html': htmlReport(data),
+    'results/2026-06-04_load_products/report.html': htmlReport(data),
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
   };
 }

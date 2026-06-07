@@ -68,3 +68,53 @@ const baseLoadScenario = {
 
 export const authLoadOptions     = baseLoadScenario;
 export const productsLoadOptions = baseLoadScenario;
+export const cartLoadOptions     = baseLoadScenario;
+export const ordersLoadOptions   = baseLoadScenario;
+export const paymentsLoadOptions = baseLoadScenario;
+
+// E2E: 20 VUs — cada iteración es un journey completo (más pesado por VU)
+export const e2eLoadOptions = {
+  scenarios: {
+    load: {
+      executor:         'ramping-vus',
+      startVUs:         0,
+      stages: [
+        { duration: '2m', target: 20 },
+        { duration: '5m', target: 20 },
+        { duration: '2m', target: 0  },
+      ],
+      gracefulRampDown: '30s',
+      gracefulStop:     '30s',
+    },
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E2E Load Test — 50 TPS (modelo abierto, constant-arrival-rate)
+// Objetivo: 50 journeys completos de compra por segundo durante 9 min
+// Estructura: 1m ramp-up → 9m hold a 50 TPS = 10 min total
+//
+// Cálculo de VUs (fórmula del skill k6-best-practices):
+//   preAllocatedVUs = ceil(rate × p95_iter_seconds × 1.2)
+//   p95 journey e2e (medido en smoke) = 11.35s
+//   → ceil(50 × 11.35 × 1.2) = 681 → 700 preAllocated, 1200 max
+//
+// Nota: dropped_iterations indica que el sistema no puede mantener el TPS
+// objetivo — es un hallazgo válido para la evaluación Black Friday.
+// ─────────────────────────────────────────────────────────────────────────────
+export const e2eTpsLoadOptions = {
+  scenarios: {
+    load: {
+      executor:        'ramping-arrival-rate',
+      startRate:       0,
+      timeUnit:        '1s',
+      stages: [
+        { duration: '1m', target: 50 },  // ramp-up hasta 50 TPS
+        { duration: '9m', target: 50 },  // hold 9 min a 50 TPS
+      ],
+      preAllocatedVUs: 700,
+      maxVUs:          1200,
+      gracefulStop:    '30s',
+    },
+  },
+};
